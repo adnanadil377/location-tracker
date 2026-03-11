@@ -1,2 +1,31 @@
-venv 
-__pycache__
+# Virtual environments
+venv/
+.env
+.env.*
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+.pytest_cache/
+
+# Migrations (optional if using Alembic)
+alembic/versions/*.pyc
