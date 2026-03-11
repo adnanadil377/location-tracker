@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GPS Location Tracker</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; background: #f4f4f4; }
+    h1 { color: #333; }
+    .card { background: white; border-radius: 8px; padding: 20px; margin: 16px 0; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .status { font-weight: bold; margin-bottom: 8px; }
+    .ok { color: green; }
+    .err { color: red; }
+    .info { color: #555; font-size: 0.95em; }
+    label { display: block; margin: 6px 0 2px; font-weight: bold; color: #444; }
+    input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    button { margin-top: 12px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
+    button:hover { background: #0056b3; }
+    #map-link { margin-top: 10px; display: block; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }
+    .badge-gps { background: #d4edda; color: #155724; }
+    .badge-default { background: #fff3cd; color: #856404; }
+  </style>
+</head>
+<body>
+  <h1>GPS Location Tracker</h1>
+
+  <!-- Live GPS section -->
+  <div class="card">
+    <div class="status" id="gps-status">Waiting for GPS permission...</div>
+    <div class="info" id="gps-info"></div>
+    <button onclick="requestGPS()">Get My Real Location</button>
+  </div>
+
+  <!-- Current server location -->
+  <div class="card">
+    <h3>Current Server Location <span class="badge" id="source-badge"></span></h3>
+    <label>Latitude</label>
+    <input type="text" id="srv-lat" readonly />
+    <label>Longitude</label>
+    <input type="text" id="srv-lng" readonly />
+    <label>Accuracy (meters)</label>
+    <input type="text" id="srv-acc" readonly />
+    <a id="map-link" href="#" target="_blank" style="display:none;">Open in Google Maps</a>
+    <br/>
+    <button onclick="fetchLocation()">Refresh from Server</button>
+  </div>
+
+  <script>
+    let watchId = null;
+
+    // Fetch current location from server on load
+    fetchLocation();
+
+    function fetchLocation() {
+      fetch('/location')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('srv-lat').value = data.latitude ?? '—';
+          document.getElementById('srv-lng').value = data.longitude ?? '—';
+          document.getElementById('srv-acc').value = data.accuracy != null ? data.accuracy + ' m' : '—';
+
+          const badge = document.getElementById('source-badge');
+          if (data.source === 'browser-gps') {
+            badge.textContent = 'Real GPS';
+            badge.className = 'badge badge-gps';
+          } else {
+            badge.textContent = 'Default';
+            badge.className = 'badge badge-default';
+          }
+
+          if (data.latitude && data.longitude) {
+            const link = document.getElementById('map-link');
+            link.href = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
+            link.textContent = `Open ${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)} in Google Maps`;
+            link.style.display = 'block';
+          }
+        })
+        .catch(() => document.getElementById('srv-lat').value = 'Error fetching');
+    }
+
+    function requestGPS() {
+      const statusEl = document.getElementById('gps-status');
+      const infoEl = document.getElementById('gps-info');
+
+      if (!navigator.geolocation) {
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Geolocation is not supported by this browser.';
+        return;
+      }
+
+      statusEl.className = 'status';
+      statusEl.textContent = 'Requesting GPS...';
+
+      // Stop any existing watch
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+
+          statusEl.className = 'status ok';
+          statusEl.textContent = `GPS Active — updating live`;
+          infoEl.textContent = `Raw: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} | Accuracy: ${accuracy.toFixed(1)} m`;
+
+          // Send to backend
+          fetch('/update-location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ latitude, longitude, accuracy })
+          })
+          .then(r => r.json())
+          .then(() => fetchLocation())
+          .catch(() => {
+            statusEl.className = 'status err';
+            statusEl.textContent = 'GPS read OK but failed to send to server.';
+          });
+        },
+        (error) => {
+          statusEl.className = 'status err';
+          const messages = {
+            1: 'Permission denied. Please allow location access.',
+            2: 'Position unavailable. Try moving or check device GPS.',
+            3: 'Request timed out. Try again.'
+          };
+          statusEl.textContent = messages[error.code] || 'Unknown error.';
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    }
+  </script>
+</body>
+</html>
