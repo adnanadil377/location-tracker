@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 import pathlib
 
-app = FastAPI()
+app = FastAPI(title="gps tracker")
 
 # Prometheus metric
 REQUEST_COUNT = Counter("gps_requests_total", "Total GPS Requests")
