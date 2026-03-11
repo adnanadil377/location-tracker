@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gps-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gps
+  template:
+    metadata:
+      labels:
+        app: gps
+    spec:
+      containers:
+      - name: gps-container
+        image: gps-microservice
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
